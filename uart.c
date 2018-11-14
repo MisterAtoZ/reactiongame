@@ -1,88 +1,157 @@
 /******** uart.c file of C2.5 : UART Driver Code ********/
+#include <string.h>
 /*** bytes offsets of UART registers from char *base ***/
-
-#define UART_BASE 0x20201000
+static char *tab = "0123456789ABCDEF";
 #define UDR 0x00
 #define UFR 0x18
 #define TXFF 0x20
 #define RXFE 0x10
-#define BUSY 0x08
-#define RXFF 0x40
-#define TXFE 0x80
+typedef volatile struct uart{
+	char *base; 						// base address; as char *
+	int n; 								// uart number 0-3
+}UART;
+UART uart; 								// 4 UART structures
 
-volatile char * base = (char *) UART_BASE;
-
-/*
-Legende:
-UDR = Data register: for read/write chars
-UFR = Status of UART port, contains:
-
-	7 	6 	 5 	  4    3   2 1 0
-| TXFE RXFF TXFF RXFE BUSY - - - |
-
-Legend for flags:
-TXFE = Tx buffer empty
-TXFF = Tx buffer full
-RXFE = Rx buffer empty
-RXFF = Rx buffer full
-BUSY = device busy
-*/
-
-int ugetc() // input a char from UART pointed by up
+int uart_init() 						// UART initialization function
 {
-	while (*(base+UFR) & RXFE); // loop if UFR is REFE:
-	//Loop als de waarde die op het adres base+UFR staat AND RXFE 1 is,
-	//dus feitelijk als op adres base+UFR de waarde RXFE staat, en er dus niks staat
-	//dat je kan lezen in de Rx buffer
-	return *(base+UDR); // return a char in UDR
-	//Returnt de waarde die nu ontvangen is
-}
-
-int uputc(char c) // output a char to UART pointed by up
-{
-	//Deze code zegt:
-	//wacht tot de Tx buffer leeg is,
-	//Daarna verstuur je iets
-	while (*(base+UFR) & TXFF); // loop if UFR is TXFF
+	int i; UART *up;
+		up = &uart;
+		up->base = (char *)(0x20201000);
+		up->n = 0;
 	
-	*(base+UDR) = c; // write char to data register
 }
 
-int ugets(char *s) // input a string of chars
+int ugetc(UART *up) 						// input a char from UART pointed by up
 {
-	while ((*s = ugetc()) != '\r') 
-	//De '\r' is de "carriage return" of "enter"
-	{
-		uputc(*s);
+	while (*(up->base+UFR) & RXFE); 		// loop if UFR is RXFE
+	return *(up->base+UDR); 				// return a char in UDR
+}
+
+int uputc(UART *up, char c) 				// output a char to UART pointed by up
+{
+	while (*(up->base+UFR) & TXFF); 		// loop if UFR is TXFF
+	*(up->base+UDR) = c; 					// write char to data register
+}
+
+int ugets(UART *up, char *s) 				// input a string of chars
+{
+	while ((*s = ugetc(up)) != '\r') {
+		uputc(up, *s);
 		s++;
 	}
 	*s = 0;
 }
 
-int uprints(char *s) // output a string of chars
+int uprints(UART *up, char *s) 					// output a string of chars
 {
 	while (*s)
-	uputc(*s++);
+	 uputc(up, *s++);
 }
 
-/*
-int uart_init() // UART initialization function
+/******************************************************************************/
+
+int urpx(UART *up, int x)
 {
-	int i; UART *up;
-	for (i=0; i<4; i++) // uart0 to uart2 are adjacent
-	{
-		up = &uart[i];
-		up->base = (char *)(0x20200100 + i*0x1000);
-		up->n = i;
-	}
-	uart[3].base = (char *)(0x10009000); // uart3 at 0x10009000
+  char c;
+  if (x){
+     c = tab[x % 16];
+     urpx(up, x / 16);
+  }
+  uputc(up, c);
 }
-*/
 
-/*
-typedef volatile struct uart{
-	char *base; // base address; as char *
-	int n; // uart number 0-3
-	}UART;
-UART uart[4]; // 4 UART structures
-*/
+int uprintx(UART *up, int x)
+{
+  uprints(up, "0x");
+  if (x==0)
+    uputc(up, '0');
+  else
+    urpx(up, x);
+  uputc(up, ' ');
+}
+
+int urpu(UART *up, int x)
+{
+  char c;
+  if (x){
+     c = tab[x % 10];
+     urpu(up, x / 10);
+  }
+  uputc(up, c);
+}
+
+int uprintu(UART *up, int x)
+{
+  if (x==0)
+    uputc(up, '0');
+  else
+    urpu(up, x);
+  uputc(up, ' ');
+}
+
+int uprinti(UART *up, int x)
+{
+  if (x<0){
+    uputc(up, '-');
+    x = -x;
+  }
+  uprintu(up, x);
+}
+
+int ufprintf(UART *up, char *fmt,...)
+{
+  int *ip;
+  char *cp;
+  cp = fmt;
+  ip = (int *)&fmt + 1;
+
+  while(*cp){
+    if (*cp != '%'){
+      uputc(up, *cp);
+      if (*cp=='\n')
+	uputc(up, '\r');
+      cp++;
+      continue;
+    }
+    cp++;
+    switch(*cp){
+    case 'c': uputc(up, (char)*ip);      break;
+    case 's': uprints(up, (char *)*ip);  break;
+    case 'd': uprinti(up, *ip);           break;
+    case 'u': uprintu(up, *ip);           break;
+    case 'x': uprintx(up, *ip);  break;
+    }
+    cp++; ip++;
+  }
+}
+
+int uprintf(char *fmt, ...)
+{
+  int *ip;
+  char *cp;
+  cp = fmt;
+  ip = (int *)&fmt + 1;
+
+  UART *up = &uart;
+
+  while(*cp){
+    if (*cp != '%'){
+      uputc(up, *cp);
+      if (*cp=='\n')
+	uputc(up, '\r');
+      cp++;
+      continue;
+    }
+    cp++;
+    switch(*cp){
+    case 'c': uputc(up, (char)*ip);      break;
+    case 's': uprints(up, (char *)*ip);   break;
+    case 'd': uprinti(up, *ip);           break;
+    case 'u': uprintu(up, *ip);           break;
+    case 'x': uprintx(up, *ip);  break;
+    }
+    cp++; ip++;
+  }
+}
+
+/******************************************************************************/

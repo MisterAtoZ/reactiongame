@@ -14,18 +14,18 @@ int main()
 	
 	enable_GPREN(&gpio[20]);
 	enable_GPREN(&gpio[26]);
-	enable_GPHEN(&gpio[20]);
-	enable_GPHEN(&gpio[26]);
+	enable_GPLEN(&gpio[20]);
+	enable_GPLEN(&gpio[26]);
 	
-	set_pulldown(&gpio[20]);
-	set_pulldown(&gpio[26]);
+	set_pullup(&gpio[20]);
+	set_pullup(&gpio[26]);
 	
 	int i;
 	char string[64];
-	//UART *up;
-	//uart_init(); // initialize UARTs
-	//up = &uart[0]; // test UART0
-	uprints("Enter lines from serial terminal 0\n\r");
+	UART *up;
+	uart_init(); // initialize UARTs
+	up = &uart; // test UART0
+	uprintf("Enter lines from serial terminal 0\n\r");
 	while(1)
 	{
 		set_output_pin(&gpio[21]);
@@ -35,42 +35,60 @@ int main()
 		
 		clear_pin(&gpio[21]);
 		
-		uprints("de waarde die uit de knop komt is: ");
-		uprints("\n\r");
+		uprintf("de waarde die uit de knop komt is: ");
+		uprintf("\n\r");
+		
+		clear_event_detect(&gpio[20]);
+		clear_event_detect(&gpio[26]);
+		int knop1test = getChange(&gpio[20]);
+		int knop2test = getChange(&gpio[26]);
+		uprintf("de waarde die uit de knop komt is: %d", knop1test);
+		uprintf("\n\r");
+		uprintf("de waarde die uit de knop komt is: %d", knop2test);
+		uprintf("\n\r");
+		
+		uprintf("de waarde van event detect: %d", gpio_reg[GPIO_GPEDS0]);
+		uprintf("\n\r");		
+		
 		
 		int eruit = 0;
 		
 		while(eruit == 0) {
 			int knop1 = getChange(&gpio[20]);
 			int knop2 = getChange(&gpio[26]);
-			
-			if(knop1 == 0) {
-				//uprints("de waarde die uit de knop komt is: "+ knop1);
-				uprints("\n\r");
-				uprints("Speler 1 heeft gewonnen");
-				uprints("\n\r");
+			uprintf("de waarde die uit de knop komt is: %d", knop1);
+			uprintf("\n\r");
+			uprintf("de waarde die uit de knop komt is: %d", knop2);
+			uprintf("\n\r");
+			if(knop1 == 1) {
+				uprintf("de waarde die uit de knop komt is: %d", knop1);
+				uprintf("\n\r");
+				uprintf("Speler 1 heeft gewonnen");
+				uprintf("\n\r");
 				eruit = 1;
 			}
 			else if(knop2 == 1) {
-				uprints("Speler 2 heeft gewonnen");
-				uprints("\n\r");
+				uprintf("de waarde die uit de knop komt is: %d", knop2);
+				uprintf("\n\r");
+				uprintf("Speler 2 heeft gewonnen");
+				uprintf("\n\r");
 				eruit = 1;
 			}
 		}
 		
-		ugets(string);
-		uprints(" ");
-		uprints(string);
-		uprints("\n\r");
+		ugets(up, string);
+		uprintf("tis gedaan");
+		uprintf(string);
+		uprintf("\n\r");
 		if (strcmp(string, "end")==0)
 			break;
 		
 	}
 	
-	uprints("Compute sum of array:\n\r");
+	uprintf("Compute sum of array:\n\r");
 	sum = 0;
 	for (i=0; i<10; i++) sum += v[i];
-	uprints("sum = ");
-	uputc((sum/10)+'0'); uputc((sum%10)+'0');
-	uprints("\n\rEND OF RUN\n\r");
+	uprintf("sum = ");
+	uputc(up, (sum/10)+'0'); uputc(up, (sum%10)+'0');
+	uprintf("\n\rEND OF RUN\n\r");
 }
