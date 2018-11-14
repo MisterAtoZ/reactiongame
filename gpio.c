@@ -110,3 +110,20 @@ void set_pullup(GPIO *up){
 void dissable_pulldown(GPIO *up) { //niet nodig want kan altijd aan blijven
 	gpio_reg[up->pud] |= (0 << up->gpio_bit);
 }
+
+void set_pull(int gpio, int pull){
+	volatile unsigned int tim;
+	int move = gpio % 32;
+	
+	gpio_reg[GPIO_GPPUD] = pull & 0x03;
+	for(tim = 0; tim < 150; tim++);
+	if(gpio<32)
+		gpio_reg[GPIO_GPPUDCLK0] = 1 << move;
+	else
+		gpio_reg[GPIO_GPPUDCLK1] = 1 << move;
+	for(tim = 0; tim < 150; tim++);
+	if(gpio<32)
+		gpio_reg[GPIO_GPPUDCLK0] = 0;
+	else
+		gpio_reg[GPIO_GPPUDCLK1] = 0;
+}

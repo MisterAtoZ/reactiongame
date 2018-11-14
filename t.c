@@ -17,8 +17,10 @@ int main()
 	enable_GPLEN(&gpio[20]);
 	enable_GPLEN(&gpio[26]);
 	
-	set_pullup(&gpio[20]);
-	set_pullup(&gpio[26]);
+	
+	
+	set_pull(20,2);
+	set_pull(26,2);
 	
 	int i;
 	char string[64];
